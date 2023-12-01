@@ -1,7 +1,8 @@
 {
   "name": "joebot",
   "scripts": {
-    "start": "bun run index.ts"
+    "start": "bun run index.ts",
+    "deploy": "bun run deploy.ts"
   },
   "module": "index.ts",
   "type": "module",

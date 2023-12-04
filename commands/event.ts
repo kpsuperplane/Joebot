@@ -55,15 +55,16 @@ const Event: Command = {
     const name = new ActionRowBuilder<TextInputBuilder>().addComponents(
       new TextInputBuilder()
         .setCustomId("name")
-        .setLabel("Event Name")
+        .setLabel("Name")
         .setStyle(TextInputStyle.Short)
         .setValue(defaultName)
+        .setRequired(true)
     );
 
     const date = new ActionRowBuilder<TextInputBuilder>().addComponents(
       new TextInputBuilder()
         .setCustomId("date")
-        .setLabel("Event Date")
+        .setLabel("Date")
         .setStyle(TextInputStyle.Short)
         .setValue(
           defaultDate?.toLocaleString("en-us", {
@@ -75,14 +76,66 @@ const Event: Command = {
             timeZone: "America/Los_Angeles",
           }) ?? ""
         )
+        .setRequired(true)
+    );
+
+    const location = new ActionRowBuilder<TextInputBuilder>().addComponents(
+      new TextInputBuilder()
+        .setCustomId("location")
+        .setLabel("Location")
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true)
+    );
+
+    const details = new ActionRowBuilder<TextInputBuilder>().addComponents(
+      new TextInputBuilder()
+        .setCustomId("details")
+        .setLabel("Details")
+        .setStyle(TextInputStyle.Paragraph)
+        .setRequired(false)
     );
 
     const modal = new ModalBuilder()
       .setCustomId("createEventModal")
       .setTitle("Create Event")
-      .addComponents(name, date);
+      .addComponents(name, date, location, details);
 
     await interaction.showModal(modal);
+
+    // Get the Modal Submit Interaction that is emitted once the User submits the Modal
+    const submitted = await interaction
+      .awaitModalSubmit({
+        // Timeout after a minute of not receiving any valid Modals
+        time: 60000,
+        // Make sure we only accept Modals from the User who sent the original Interaction we're responding to
+        filter: (i) => i.user.id === interaction.user.id,
+      })
+      .catch((error) => {
+        // Catch any Errors that are thrown (e.g. if the awaitModalSubmit times out after 60000 ms)
+        console.error(error);
+        return null;
+      });
+
+    // If we got our Modal, we can do whatever we want with it down here. Remember that the Modal
+    // can have multiple Action Rows, but each Action Row can have only one TextInputComponent. You
+    // can use the ModalSubmitInteraction.fields helper property to get the value of an input field
+    // from it's Custom ID. See https://old.discordjs.dev/#/docs/discord.js/stable/class/ModalSubmitFieldsResolver for more info.
+    if (submitted) {
+      const parsedDate = parser.parseDate(submitted.fields.getTextInputValue('date'));
+      if (parsedDate != null) {
+        const data = {
+          name: submitted.fields.getTextInputValue('name'),
+          date: parsedDate,
+          location: submitted.fields.getTextInputValue('location'),
+          details: submitted.fields.getTextInputValue('details'),
+        };
+        await submitted.reply({
+          content: `Received input: ${JSON.stringify(data)}`,
+        });
+      } else {
+        submitted.reply({content: "Unable to parse date for " + submitted.fields.getTextInputValue('date')})
+      }
+    }
   },
 };
 

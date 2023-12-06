@@ -13,6 +13,7 @@ Create a `env.local` file with the following:
 DISCORD_TOKEN=
 CLIENT_ID=
 GUILD_ID=
+CAT_API_KEY=
 ```
 
 To run:

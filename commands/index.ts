@@ -1,7 +1,9 @@
 import Event from "./event";
 import { Command } from "./Command";
+import Meow from "./meow";
+import Ree from "./ree";
 
-const COMMANDS = [Event];
+const COMMANDS = [Event, Meow, Ree];
 
 const toExport: { [name: string]: Command } = COMMANDS.reduce(
   (acc, command) => ({ ...acc, [command.builder.name]: command }),

@@ -8,6 +8,8 @@ import {
 } from "discord.js";
 import { Command } from "./Command";
 import * as chrono from "chrono-node";
+import prisma from "../prisma/client";
+import { getEventEmbed } from "../lib/event";
 
 const parser = chrono.casual.clone();
 parser.refiners.push({
@@ -38,26 +40,27 @@ const Event: Command = {
   execute: async (interaction: CommandInteraction) => {
     const input = interaction.options.get("input")?.value;
 
-    let defaultName = "";
+    let defaultTitle = "";
     let defaultDate: Date | null = null;
     if (typeof input === "string") {
+      defaultTitle = input;
       const parsed = parser.parse(
         input,
         { instant: new Date(), timezone: "America/Los_Angeles" },
         { forwardDate: true }
       );
       if (parsed.length > 0) {
-        defaultName = input.replace(parsed[0].text, "");
+        defaultTitle = input.replace(parsed[0].text, "");
         defaultDate = parsed[0].date();
       }
     }
 
-    const name = new ActionRowBuilder<TextInputBuilder>().addComponents(
+    const title = new ActionRowBuilder<TextInputBuilder>().addComponents(
       new TextInputBuilder()
-        .setCustomId("name")
-        .setLabel("Name")
+        .setCustomId("title")
+        .setLabel("Title")
         .setStyle(TextInputStyle.Short)
-        .setValue(defaultName)
+        .setValue(defaultTitle)
         .setRequired(true)
     );
 
@@ -87,10 +90,10 @@ const Event: Command = {
         .setRequired(true)
     );
 
-    const details = new ActionRowBuilder<TextInputBuilder>().addComponents(
+    const description = new ActionRowBuilder<TextInputBuilder>().addComponents(
       new TextInputBuilder()
-        .setCustomId("details")
-        .setLabel("Details")
+        .setCustomId("description")
+        .setLabel("Description")
         .setStyle(TextInputStyle.Paragraph)
         .setRequired(false)
     );
@@ -98,7 +101,7 @@ const Event: Command = {
     const modal = new ModalBuilder()
       .setCustomId("createEventModal")
       .setTitle("Create Event")
-      .addComponents(name, date, location, details);
+      .addComponents(title, date, location, description);
 
     await interaction.showModal(modal);
 
@@ -121,19 +124,28 @@ const Event: Command = {
     // can use the ModalSubmitInteraction.fields helper property to get the value of an input field
     // from it's Custom ID. See https://old.discordjs.dev/#/docs/discord.js/stable/class/ModalSubmitFieldsResolver for more info.
     if (submitted) {
-      const parsedDate = parser.parseDate(submitted.fields.getTextInputValue('date'));
+      const parsedDate = parser.parseDate(
+        submitted.fields.getTextInputValue("date")
+      );
       if (parsedDate != null) {
         const data = {
-          name: submitted.fields.getTextInputValue('name'),
-          date: parsedDate,
-          location: submitted.fields.getTextInputValue('location'),
-          details: submitted.fields.getTextInputValue('details'),
+          title: submitted.fields.getTextInputValue("title"),
+          start: parsedDate,
+          location: submitted.fields.getTextInputValue("location"),
+          description: submitted.fields.getTextInputValue("description"),
         };
+        const { id } = await prisma.event.create({
+          data,
+        });
         await submitted.reply({
-          content: `Received input: ${JSON.stringify(data)}`,
+          embeds: [await getEventEmbed(id)],
         });
       } else {
-        submitted.reply({content: "Unable to parse date for " + submitted.fields.getTextInputValue('date')})
+        submitted.reply({
+          content:
+            "Unable to parse date for " +
+            submitted.fields.getTextInputValue("date"),
+        });
       }
     }
   },

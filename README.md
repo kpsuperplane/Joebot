@@ -16,6 +16,12 @@ GUILD_ID=
 CAT_API_KEY=
 ```
 
+Set up your DB:
+```
+bunx prisma deploy
+bunx prisma migrate
+```
+
 To run:
 
 ```bash

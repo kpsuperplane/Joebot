@@ -14,7 +14,7 @@ model Event {
   id Int @id @default(autoincrement())
   start DateTime
   title String
-  shortname String
+  channel_id String
   guild_id String
   description String
   location String

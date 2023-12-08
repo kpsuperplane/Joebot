@@ -14,6 +14,7 @@ model Event {
   id Int @id @default(autoincrement())
   start DateTime
   title String
+  shortname String
   description String
   location String
 }

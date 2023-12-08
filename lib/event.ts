@@ -1,4 +1,4 @@
-import { EmbedBuilder, hyperlink, time } from "discord.js";
+import { EmbedBuilder, channelMention, hyperlink, time } from "discord.js";
 import prisma from "../prisma/client";
 
 function notEmpty<TValue>(value: TValue): value is NonNullable<TValue> {
@@ -14,6 +14,12 @@ export async function getEventEmbed(eventId: number): Promise<EmbedBuilder> {
         {
           name: "Date",
           value: time(event!.start),
+          inline: true,
+        },
+        {
+          name: "Channel",
+          value: channelMention(event!.channel_id),
+          inline: true,
         },
         {
           name: "Location",

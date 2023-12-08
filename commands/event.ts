@@ -4,6 +4,7 @@ import {
   CommandInteraction,
   ModalBuilder,
   SlashCommandBuilder,
+  TextChannel,
   TextInputBuilder,
   TextInputStyle,
 } from "discord.js";
@@ -28,40 +29,59 @@ parser.refiners.push({
   },
 });
 
+function parseDate(dateString: string | null | undefined): Date | null {
+  if (typeof dateString === "string") {
+    return parser.parseDate(
+      dateString,
+      { instant: new Date(), timezone: "America/Los_Angeles" },
+      { forwardDate: true }
+    );
+  }
+  return null;
+}
+
+function formatDate(date: Date | null): string {
+  return (
+    date?.toLocaleString("en-us", {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+      hour: "numeric",
+      minute: "numeric",
+      timeZone: "America/Los_Angeles",
+    }) ?? ""
+  );
+}
+
 const Event: Command = {
   builder: new SlashCommandBuilder()
     .setName("event")
     .setDescription("Create an event")
     .addStringOption((option) =>
+      option.setName("title").setDescription("Event title")
+    )
+    .addChannelOption((option) =>
       option
-        .setName("input")
-        .setDescription("Tell me about this event")
-        .setRequired(true)
+        .setName("category")
+        .setDescription("Category")
+        .addChannelTypes(ChannelType.GuildCategory, ChannelType.GuildText)
+    )
+    .addStringOption((option) =>
+      option.setName("date").setDescription("Date and Time")
+    )
+    .addStringOption((option) =>
+      option.setName("location").setDescription("Location")
+    )
+    .addStringOption((option) =>
+      option.setName("shortname").setDescription("Channel Name")
     ),
   execute: async (interaction: CommandInteraction) => {
-    const input = interaction.options.get("input")?.value;
-
-    let defaultTitle = "";
-    let defaultDate: Date | null = null;
-    if (typeof input === "string") {
-      defaultTitle = input;
-      const parsed = parser.parse(
-        input,
-        { instant: new Date(), timezone: "America/Los_Angeles" },
-        { forwardDate: true }
-      );
-      if (parsed.length > 0) {
-        defaultTitle = input.replace(parsed[0].text, "");
-        defaultDate = parsed[0].date();
-      }
-    }
-
     const title = new ActionRowBuilder<TextInputBuilder>().addComponents(
       new TextInputBuilder()
         .setCustomId("title")
         .setLabel("Title")
         .setStyle(TextInputStyle.Short)
-        .setValue(defaultTitle)
+        .setValue(interaction.options.get("title")?.value?.toString() ?? "")
         .setRequired(true)
     );
 
@@ -70,6 +90,7 @@ const Event: Command = {
         .setCustomId("shortname")
         .setLabel("Channel Name")
         .setStyle(TextInputStyle.Short)
+        .setValue(interaction.options.get("shortname")?.value?.toString() ?? "")
         .setRequired(true)
     );
 
@@ -79,14 +100,9 @@ const Event: Command = {
         .setLabel("Date")
         .setStyle(TextInputStyle.Short)
         .setValue(
-          defaultDate?.toLocaleString("en-us", {
-            weekday: "short",
-            day: "numeric",
-            month: "short",
-            hour: "numeric",
-            minute: "numeric",
-            timeZone: "America/Los_Angeles",
-          }) ?? ""
+          formatDate(
+            parseDate(interaction.options.get("date")?.value?.toString())
+          )
         )
         .setRequired(true)
     );
@@ -95,6 +111,7 @@ const Event: Command = {
       new TextInputBuilder()
         .setCustomId("location")
         .setLabel("Location")
+        .setValue(interaction.options.get("location")?.value?.toString() ?? "")
         .setStyle(TextInputStyle.Short)
         .setRequired(true)
     );
@@ -107,8 +124,10 @@ const Event: Command = {
         .setRequired(false)
     );
 
+    const id = `modal:${interaction.id}`;
+
     const modal = new ModalBuilder()
-      .setCustomId("createEventModal")
+      .setCustomId(id)
       .setTitle("Create Event")
       .addComponents(title, shortname, date, location, description);
 
@@ -118,9 +137,9 @@ const Event: Command = {
     const submitted = await interaction
       .awaitModalSubmit({
         // Timeout after a minute of not receiving any valid Modals
-        time: 60000,
+        time: 600000,
         // Make sure we only accept Modals from the User who sent the original Interaction we're responding to
-        filter: (i) => i.user.id === interaction.user.id,
+        filter: (i) => i.customId === id,
       })
       .catch((error) => {
         // Catch any Errors that are thrown (e.g. if the awaitModalSubmit times out after 60000 ms)
@@ -133,40 +152,61 @@ const Event: Command = {
     // can use the ModalSubmitInteraction.fields helper property to get the value of an input field
     // from it's Custom ID. See https://old.discordjs.dev/#/docs/discord.js/stable/class/ModalSubmitFieldsResolver for more info.
     if (submitted) {
-      const parsedDate = parser.parseDate(
-        submitted.fields.getTextInputValue("date")
-      );
-      if (parsedDate != null) {
+      const start = parseDate(submitted.fields.getTextInputValue("date"));
+      if (start != null) {
+        const shortname = submitted.fields.getTextInputValue("shortname");
         const data = {
           title: submitted.fields.getTextInputValue("title"),
-          start: parsedDate,
-          shortname: submitted.fields.getTextInputValue("shortname"),
+          start,
           location: submitted.fields.getTextInputValue("location"),
           description: submitted.fields.getTextInputValue("description"),
         };
-        if (data.shortname.match(/[^a-z\-0-9]/) != null) {
-          await submitted.reply({
-            content:
-              "Shortname must only contain lowercase characters, numbers, and dashes",
+        if (shortname.match(/[^a-z\-0-9]/) != null) {
+          await submitted.reply(
+            "Shortname must only contain lowercase characters, numbers, and dashes"
+          );
+          return;
+        }
+        if (interaction.guild == null) {
+          await submitted.reply("Error: Not in a guild");
+          return;
+        }
+        let parent = interaction.options.get("category")?.channel;
+        let channel;
+        if (parent != null && parent.type === ChannelType.GuildText) {
+          parent = (await interaction.guild.channels.fetch(
+            parent.id
+          )) as TextChannel;
+          channel = await parent.threads.create({
+            name: shortname,
+            type: ChannelType.PublicThread,
           });
+        } else {
+          channel = await interaction.guild.channels.create({
+            name: shortname,
+            parent: parent?.id,
+            type: ChannelType.GuildText,
+          });
+        }
+        if (channel == null) {
+          await submitted.reply("Error: Unable to create channel");
           return;
         }
         const { id } = await prisma.event.create({
-          data,
+          data: {
+            ...data,
+            guild_id: interaction.guild.id,
+            channel_id: channel.id,
+          },
         });
         await submitted.reply({
           embeds: [await getEventEmbed(id)],
         });
-        await interaction.guild?.channels.create({
-          name: data.shortname,
-          type: ChannelType.GuildText,
-        });
       } else {
-        await submitted.reply({
-          content:
-            "Unable to parse date for " +
-            submitted.fields.getTextInputValue("date"),
-        });
+        await submitted.reply(
+          "Unable to parse date for " +
+            submitted.fields.getTextInputValue("date")
+        );
       }
     }
   },

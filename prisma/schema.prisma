@@ -15,6 +15,7 @@ model Event {
   start DateTime
   title String
   shortname String
+  guild_id String
   description String
   location String
 }

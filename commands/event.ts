@@ -1,5 +1,6 @@
 import {
   ActionRowBuilder,
+  ChannelType,
   CommandInteraction,
   ModalBuilder,
   SlashCommandBuilder,
@@ -64,6 +65,14 @@ const Event: Command = {
         .setRequired(true)
     );
 
+    const shortname = new ActionRowBuilder<TextInputBuilder>().addComponents(
+      new TextInputBuilder()
+        .setCustomId("shortname")
+        .setLabel("Channel Name")
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true)
+    );
+
     const date = new ActionRowBuilder<TextInputBuilder>().addComponents(
       new TextInputBuilder()
         .setCustomId("date")
@@ -101,7 +110,7 @@ const Event: Command = {
     const modal = new ModalBuilder()
       .setCustomId("createEventModal")
       .setTitle("Create Event")
-      .addComponents(title, date, location, description);
+      .addComponents(title, shortname, date, location, description);
 
     await interaction.showModal(modal);
 
@@ -131,17 +140,29 @@ const Event: Command = {
         const data = {
           title: submitted.fields.getTextInputValue("title"),
           start: parsedDate,
+          shortname: submitted.fields.getTextInputValue("shortname"),
           location: submitted.fields.getTextInputValue("location"),
           description: submitted.fields.getTextInputValue("description"),
         };
+        if (data.shortname.match(/[^a-z\-0-9]/) != null) {
+          await submitted.reply({
+            content:
+              "Shortname must only contain lowercase characters, numbers, and dashes",
+          });
+          return;
+        }
         const { id } = await prisma.event.create({
           data,
         });
         await submitted.reply({
           embeds: [await getEventEmbed(id)],
         });
+        await interaction.guild?.channels.create({
+          name: data.shortname,
+          type: ChannelType.GuildText,
+        });
       } else {
-        submitted.reply({
+        await submitted.reply({
           content:
             "Unable to parse date for " +
             submitted.fields.getTextInputValue("date"),

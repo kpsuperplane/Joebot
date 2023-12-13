@@ -2,12 +2,10 @@ import {
   ChannelType,
   CommandInteraction,
   SlashCommandBuilder,
-  TextChannel,
 } from "discord.js";
 import { Command } from "./Command";
 import prisma from "../prisma/client";
 import { getEventEmbed, presentEventModal } from "../lib/event";
-import { parseDate } from "../lib/date";
 import { connectOrCreateGuild, findOrCreateGuild } from "../lib/guild";
 
 const Event: Command = {
@@ -15,25 +13,13 @@ const Event: Command = {
     .setName("event")
     .setDescription("Create an event")
     .addStringOption((option) =>
-      option.setName("title").setDescription("Event title")
+      option.setName("title").setDescription("Event title").setRequired(true)
     )
     .addChannelOption((option) =>
       option
         .setName("category")
         .setDescription("Category")
         .addChannelTypes(ChannelType.GuildCategory, ChannelType.GuildText)
-    )
-    .addStringOption((option) =>
-      option.setName("start").setDescription("Start Date and Time")
-    )
-    .addStringOption((option) =>
-      option.setName("end").setDescription("End Date and Time")
-    )
-    .addStringOption((option) =>
-      option.setName("location").setDescription("Location")
-    )
-    .addStringOption((option) =>
-      option.setName("shortname").setDescription("Channel Name")
     ),
   execute: async (interaction: CommandInteraction) => {
     if (interaction.guild == null) {
@@ -44,25 +30,21 @@ const Event: Command = {
       return;
     }
 
-    const result = await presentEventModal(interaction, {
-      title: interaction.options.get("title")?.value?.toString(),
-      shortname: interaction.options.get("shortname")?.value?.toString(),
-      start:
-        parseDate(interaction.options.get("date")?.value?.toString()) ??
-        undefined,
-      location: interaction.options.get("location")?.value?.toString(),
-    });
+    const title = interaction.options.get("title", true).value!.toString();
+
+    const result = await presentEventModal(title, interaction);
     
     if (result == null) {
       return;
     }
 
     const {
-      data: { shortname, ...event },
+      data: { shortname, ...data },
       submission,
     } = result;
 
     const guild = await findOrCreateGuild(interaction.guild.id);
+
     const parentId =
       interaction.options.get("category")?.channel?.id ?? guild.category;
     const parent =
@@ -91,7 +73,8 @@ const Event: Command = {
     }
     const { id } = await prisma.event.create({
       data: {
-        ...event,
+        title,
+        ...data,
         guild: connectOrCreateGuild(interaction.guild.id),
         channel_id: channel.id,
       },

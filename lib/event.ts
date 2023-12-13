@@ -60,31 +60,23 @@ export async function getEventEmbed(eventId: number): Promise<EmbedBuilder> {
 }
 
 export async function presentEventModal(
-  interaction: CommandInteraction,
-  defaults: Partial<
-    Omit<Event, "id" | "channel_id" | "guild_id"> & { shortname: string }
-  >
+  title: string,
+  interaction: CommandInteraction
 ): Promise<{
   submission: ModalSubmitInteraction;
-  data: Omit<Event, "id" | "channel_id" | "guild_id"> & {
+  data: {
     shortname: string;
+    start: Date;
+    end: Date;
+    location: string;
+    description: string;
   };
 } | null> {
-  const titleComponent = new ActionRowBuilder<TextInputBuilder>().addComponents(
-    new TextInputBuilder()
-      .setCustomId("title")
-      .setLabel("Title")
-      .setStyle(TextInputStyle.Short)
-      .setValue(defaults.title ?? "")
-      .setRequired(true)
-  );
-
   const locationComponent =
     new ActionRowBuilder<TextInputBuilder>().addComponents(
       new TextInputBuilder()
         .setCustomId("location")
         .setLabel("Location")
-        .setValue(defaults.location ?? "")
         .setStyle(TextInputStyle.Short)
         .setRequired(true)
     );
@@ -94,31 +86,9 @@ export async function presentEventModal(
       new TextInputBuilder()
         .setCustomId("description")
         .setLabel("Description")
-        .setValue(defaults.description ?? "")
         .setStyle(TextInputStyle.Paragraph)
         .setRequired(false)
     );
-
-  const page1Id = `modal:${interaction.id}:1`;
-
-  const page1Modal = new ModalBuilder()
-    .setCustomId(page1Id)
-    .setTitle("Create Event")
-    .addComponents(titleComponent, locationComponent, descriptionComponent);
-
-  await interaction.showModal(page1Modal);
-
-  // Get the Modal Submit Interaction that is emitted once the User submits the Modal
-  const page1Submission = await interaction.awaitModalSubmit({
-    // Timeout after a minute of not receiving any valid Modals
-    time: 600000,
-    // Make sure we only accept Modals from the User who sent the original Interaction we're responding to
-    filter: (i) => i.customId === page1Id,
-  });
-
-  const title = page1Submission.fields.getTextInputValue("title");
-  const location = page1Submission.fields.getTextInputValue("location");
-  const description = page1Submission.fields.getTextInputValue("description");
 
   const shortnameComponent =
     new ActionRowBuilder<TextInputBuilder>().addComponents(
@@ -126,7 +96,6 @@ export async function presentEventModal(
         .setCustomId("shortname")
         .setLabel("Channel Name")
         .setStyle(TextInputStyle.Short)
-        .setValue(defaults.shortname ?? "")
         .setRequired(true)
     );
 
@@ -135,7 +104,6 @@ export async function presentEventModal(
       .setCustomId("start")
       .setLabel("Date")
       .setStyle(TextInputStyle.Short)
-      .setValue(defaults.start != null ? formatDate(defaults.start) : "")
       .setRequired(true)
   );
 
@@ -144,27 +112,34 @@ export async function presentEventModal(
       .setCustomId("end")
       .setLabel("End Date")
       .setStyle(TextInputStyle.Short)
-      .setValue(defaults.end != null ? formatDate(defaults.end) : "")
       .setRequired(true)
   );
 
-  const page2Id = `modal:${interaction.id}:2`;
+  const id = `modal:${interaction.id}`;
 
-  const page2Modal = new ModalBuilder()
-    .setCustomId(page2Id)
+  const modal = new ModalBuilder()
+    .setCustomId(id)
     .setTitle(title)
-    .addComponents(shortnameComponent, startComponent, endComponent);
+    .addComponents(
+      shortnameComponent,
+      startComponent,
+      endComponent,
+      locationComponent,
+      descriptionComponent
+    );
 
-  await interaction.showModal(page2Modal);
+  await interaction.showModal(modal);
 
   // Get the Modal Submit Interaction that is emitted once the User submits the Modal
   const submission = await interaction.awaitModalSubmit({
     // Timeout after a minute of not receiving any valid Modals
     time: 600000,
     // Make sure we only accept Modals from the User who sent the original Interaction we're responding to
-    filter: (i) => i.customId === page2Id,
+    filter: (i) => i.customId === id,
   });
 
+  const location = submission.fields.getTextInputValue("location");
+  const description = submission.fields.getTextInputValue("description");
   const shortname = submission.fields.getTextInputValue("shortname");
   const start = parseDate(submission.fields.getTextInputValue("start"));
   const end = parseDate(submission.fields.getTextInputValue("end"));
@@ -190,7 +165,6 @@ export async function presentEventModal(
   return {
     submission,
     data: {
-      title,
       start,
       end,
       location,

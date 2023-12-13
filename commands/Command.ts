@@ -1,5 +1,5 @@
 import {
-  CommandInteraction,
+  ChatInputCommandInteraction,
   RESTPostAPIChatInputApplicationCommandsJSONBody,
 } from "discord.js";
 
@@ -8,5 +8,5 @@ export type Command = {
     name: string;
     toJSON: () => RESTPostAPIChatInputApplicationCommandsJSONBody;
   };
-  execute: (interaction: CommandInteraction) => Promise<void>;
+  execute: (interaction: ChatInputCommandInteraction) => Promise<void>;
 };

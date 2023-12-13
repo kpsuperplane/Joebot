@@ -15,7 +15,14 @@ model Event {
   start       DateTime
   title       String
   channel_id  String
+  guild       Guild    @relation(fields: [guild_id], references: [id])
   guild_id    String
   description String
   location    String
+}
+
+model Guild {
+  id    String  @id
+  events Event[]
+  category String?
 }

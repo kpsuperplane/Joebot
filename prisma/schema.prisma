@@ -13,6 +13,7 @@ datasource db {
 model Event {
   id          Int      @id @default(autoincrement())
   start       DateTime
+  end         DateTime
   title       String
   channel_id  String
   guild       Guild    @relation(fields: [guild_id], references: [id])
@@ -22,7 +23,7 @@ model Event {
 }
 
 model Guild {
-  id    String  @id
-  events Event[]
+  id       String  @id
+  events   Event[]
   category String?
 }

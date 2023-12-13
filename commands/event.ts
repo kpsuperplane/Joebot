@@ -24,7 +24,10 @@ const Event: Command = {
         .addChannelTypes(ChannelType.GuildCategory, ChannelType.GuildText)
     )
     .addStringOption((option) =>
-      option.setName("date").setDescription("Date and Time")
+      option.setName("start").setDescription("Start Date and Time")
+    )
+    .addStringOption((option) =>
+      option.setName("end").setDescription("End Date and Time")
     )
     .addStringOption((option) =>
       option.setName("location").setDescription("Location")
@@ -49,9 +52,8 @@ const Event: Command = {
         undefined,
       location: interaction.options.get("location")?.value?.toString(),
     });
-
-    if ("error" in result) {
-      result.submission.reply({ content: result.error, ephemeral: true });
+    
+    if (result == null) {
       return;
     }
 

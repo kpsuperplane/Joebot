@@ -19,34 +19,40 @@ function notEmpty<TValue>(value: TValue): value is NonNullable<TValue> {
 }
 
 export async function getEventEmbed(eventId: number): Promise<EmbedBuilder> {
-  const event = await prisma.event.findUnique({ where: { id: eventId } });
-  return new EmbedBuilder().setTitle(event!.title).setFields(
+  const event = await prisma.event.findUniqueOrThrow({
+    where: { id: eventId },
+  });
+  return new EmbedBuilder().setTitle(event.title).setFields(
     [
       {
         name: "Date",
-        value: time(event!.start),
+        value: `${time(event.start)} - ${
+          event.end.getTime() - event.start.getTime() > 86400000
+            ? time(event.end)
+            : time(event.end, "t")
+        }`,
         inline: true,
       },
       {
         name: "Channel",
-        value: channelMention(event!.channel_id),
+        value: channelMention(event.channel_id),
         inline: true,
       },
       {
         name: "Location",
-        value: `${event!.location}\n${hyperlink(
+        value: `${event.location}\n${hyperlink(
           "Google Maps",
           "https://www.google.com/maps/search/?api=1&query=" +
-            encodeURIComponent(event!.location)
+            encodeURIComponent(event.location)
         )} | ${hyperlink(
           "Apple Maps",
-          "http://maps.apple.com/?q=" + encodeURIComponent(event!.location)
+          "http://maps.apple.com/?q=" + encodeURIComponent(event.location)
         )}`,
       },
-      event!.description.trim() != ""
+      event.description.trim() != ""
         ? {
             name: "Description",
-            value: event!.description,
+            value: event.description,
           }
         : null,
     ].filter(notEmpty)
